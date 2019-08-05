@@ -3,7 +3,7 @@ from WonderPy.core.wwConstants import WWRobotConstants
 from threading import Thread
 import twitter
 from queue import *
-from aiohttp import web
+import eventlet
 import socketio
 '''
 This example requires you to set up a Twitter Application (https://apps.twitter.com/) 
@@ -16,31 +16,22 @@ we are listening to the Twitter account @twitterBot:
 @twitterBot drive left 50
 @twitterBot turn right 90
 '''
-# creates a new Async Socket IO Server
-sio = socketio.AsyncServer()
-# Creates a new Aiohttp Web Application
-app = web.Application()
-# Binds our Socket.IO server to our Web App
-# instance
-sio.attach(app)
-def index(request):
-    with open('index.html') as f:
-        return web.Response(text=f.read(), content_type='text/html')
 
-# If we wanted to create a new websocket endpoint,
-# use this decorator, passing in the name of the
-# event we wish to listen out for
-@sio.on('message')
-def print_message(sid, message):
-    # When we receive a new event of type
-    # 'message' through a socket.io connection
-    # we print the socket ID and the message
-    print("Socket ID: " , sid)
-    print(message)
+sio = socketio.Server()
+app = socketio.WSGIApp(sio, static_files={
+    '/': {'content_type': 'text/html', 'filename': 'index.html'}
+})
+@sio.event
+def connect(sid, environ):
+    print('connect ', sid)
 
-# We bind our aiohttp endpoint to our app
-# router
-app.router.add_get('/', index)
+@sio.event
+def my_message(sid, data):
+    print('message ', data)
+
+@sio.event
+def disconnect(sid):
+    print('disconnect ', sid)
 
 class Direction(object):
     LEFT = 0
@@ -270,4 +261,4 @@ class TwitterBot(object):
 
 if __name__ == "__main__":
     WonderPy.core.wwMain.start(TwitterBot())
-    web.run_app(app)
+    eventlet.wsgi.server(eventlet.listen(('', 5000)), app)
