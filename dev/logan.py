@@ -171,6 +171,8 @@ class TwitterBot(object):
             # We have found an action, direction, and value
             if action != None and direction != None and value != None:
                 if self.are_params_valid(action, direction, value):
+                   self._action_queue.put({"type": action, "direction": direction, "value": value,
+                                            "readable": readable_action})
                     print("Added: {0}, {1}, {2}".format(action, direction, value))
                 else:
                     # Command given is not valid
@@ -192,6 +194,7 @@ class TwitterBot(object):
             if action == ActionType.ROTATE:
                 return (direction == Direction.LEFT or direction == Direction.RIGHT) and\
                        value >= ROTATION_MIN and value <= ROTATION_MAX
+        print('Not Valid?')
         return False
 
     def perform_drive(self, direction, distance):
