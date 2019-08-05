@@ -12,9 +12,12 @@
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.2.0/socket.io.js"></script>
     <script>
-      const socket = io("http://localhost:5000");
-
+      const socket = io("http://192.168.1.14:5000");
+      socket.on('connect', function() {
+        console.log("Successfully connected!");
+    });
       function sendMsg() {
+        console.log('Click ')
         socket.emit("message", "HELLO WORLD");
       }
     </script>
