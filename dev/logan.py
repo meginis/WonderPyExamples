@@ -91,8 +91,6 @@ class TwitterBot(object):
         print("starting async threads for %s" % (self._robot.name))
         self._async_thread1 = Thread(target=self.action_listener_async)
         self._async_thread1.start()
-        self._async_thread2 = Thread(target=self.twitter_async)
-        self._async_thread2.start()
         self._async_thread3 = Thread(target=self.socketStartup)
         self._async_thread3.start()
         
@@ -107,6 +105,7 @@ class TwitterBot(object):
 
         @sio.event
         def message(sid, data):
+            self.parse_message(data)
             print('message ', data)
 
         @sio.event
@@ -123,12 +122,6 @@ class TwitterBot(object):
         while True:
             action = self._action_queue.get(block=True)
 
-            # Reply to the user telling them their action is about to be performed
-            self._twitter_api.PostUpdate(status="Performing action: " + action["readable"],
-                                         in_reply_to_status_id=action["id"],
-                                         auto_populate_reply_metadata=True)
-
-
             print("Performing action: " + action["readable"])
 
             if action["type"] == ActionType.DRIVE:
@@ -136,28 +129,7 @@ class TwitterBot(object):
             elif action["type"] == ActionType.ROTATE:
                 self.perform_rotate(action["direction"], action["value"])
 
-    def twitter_async(self):
-        '''
-        Listens for twitter messages sent to any users in the TWITTER_USERS array. Creates and adds actions to the queue
-        based on the content of the message
-        :return: None
-        '''
-
-        try:
-            # Setup the twitter api
-            self._twitter_api = twitter.Api(consumer_key=TWITTER_CONSUMER_KEY,
-                                            consumer_secret=TWITTER_CONSUMER_SECRET,
-                                            access_token_key=TWITTER_ACCESS_TOKEN_KEY,
-                                            access_token_secret=TWITTER_ACCESS_TOKEN_SECRET)
-
-            print("twitter setup successfully")
-
-            for line in self._twitter_api.GetStreamFilter(track=TWITTER_USERS, languages=TWITTER_LANG):
-                self.parse_message(line["text"], line["id"])
-        except twitter.TwitterError:
-            print("Unauthorized Twitter credentials. Verify Twitter keys and tokens are correct")
-
-    def parse_message(self, message, tweet_id):
+    def parse_message(self, message):
         '''
         Parses a message and turns it into actions and adds them to the action queue
         Each action must follow the order <action type> <direction> <value>
@@ -199,22 +171,12 @@ class TwitterBot(object):
             # We have found an action, direction, and value
             if action != None and direction != None and value != None:
                 if self.are_params_valid(action, direction, value):
-                    self._action_queue.put({"type": action, "direction": direction, "value": value, "id": tweet_id,
-                                            "readable": readable_action})
                     print("Added: {0}, {1}, {2}".format(action, direction, value))
                 else:
                     # Command given is not valid
                     # Send a reply informing the user
-                    self._twitter_api.PostUpdate(status="Invalid action: " + readable_action,
-                                                 in_reply_to_status_id=tweet_id,
-                                                 auto_populate_reply_metadata=True)
                     print("Invalid command: {0}".format(readable_action))
                 return
-        # The entire message has been parsed and no message was found
-        # Inform the sender that their message did not contain a valid action
-        self._twitter_api.PostUpdate(status="No valid action received, must specify an action, direction, and value",
-                                     in_reply_to_status_id=tweet_id,
-                                     auto_populate_reply_metadata=True)
     
     def are_params_valid(self, action, direction, value):
         '''
